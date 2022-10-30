@@ -1,0 +1,77 @@
+
+#include <energyic_UART.h>
+#include <SoftwareSerial.h>
+#include <SPI.h>
+#include <SD.h>
+
+SoftwareSerial ATMSerial(PB15, PA8); //(RX, TX) RX to STM TX,TX to STM RX
+ATM90E26_UART eic(&ATMSerial);
+
+double Voltage, Current, currentRead, ActivePower, activePower, PowerFactor, Frequency, ImportEnergy, ExportEnergy, Energy, energyAcc = 0.00;
+int Reset = PB14;
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println("\nATM90E26 UART Test Started");
+  delay(2000);
+  pinMode(Reset, OUTPUT);
+  digitalWrite(Reset, HIGH);
+  delay(100);
+
+  ATMSerial.begin(9600);
+  eic.InitEnergyIC();
+  delay(1000);
+}
+
+void loop() {
+  for (int i = 0; i < 3; i++) {
+    takeReadings();           delay(10);
+    serialPrintData();        delay(10);
+  }
+  Energy = (eic.GetAbsoluteEnergy());  delay(10);
+  Serial.print("Energy:");          Serial.println(Energy, 5);
+
+  energyAcc = energyAcc + Energy;
+  Serial.print("Energy Accumulated:");          Serial.println(energyAcc, 5);
+  Serial.println(" ");      delay(1000);
+}
+
+/*******************Take readings from ASIC*************/
+void takeReadings()
+{
+  ATMSerial.begin(9600);
+  Serial.print("Sys Status:");
+  unsigned short s_status = eic.GetSysStatus();
+  if (s_status == 0xFFFF)
+  {
+    Serial.println("Meter not ready");
+  }
+
+  Serial.println(eic.GetSysStatus(), HEX);
+  delay(10);
+  Serial.print("Meter Status:");
+  Serial.println(eic.GetMeterStatus(), HEX);
+  delay(10);
+
+  Voltage = (abs(eic.GetLineVoltage())) * 2;          delay(10);
+  if (Voltage == 0.00) {
+    Serial.println("Resetting . . .");                delay(10);
+    digitalWrite(Reset, LOW);
+  }
+  Current  = (abs(eic.GetLineCurrent())) * 2;         delay(10);
+  ActivePower  = (abs(eic.GetActivePower())) * 4;     delay(10);
+  PowerFactor  = abs(eic.GetPowerFactor());     delay(10);
+  Frequency    = (eic.GetFrequency() * 0.9767);       delay(10);
+  //  Frequency    = (eic.GetFrequency());
+  delay(10000);
+}
+
+/*******************Print data to Serial Monitor*************/
+void serialPrintData()
+{
+  Serial.print("Voltage:");         Serial.println(Voltage);
+  Serial.print("Current:");         Serial.println(Current, 3);
+  Serial.print("Power factor:");    Serial.println(PowerFactor);
+  Serial.print("Frequency:");       Serial.println(Frequency);
+  Serial.print("Active power:");    Serial.println(ActivePower, 3);
+}
